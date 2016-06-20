@@ -19,36 +19,33 @@ indent() {
     sed 's/^/  /'
 }
 
+build() {
+    echo "changed/new file: $path"
+    make $1 from="${path#$rel}" | indent
+    local sped=($(reverse_deps "$2" $1))
+    if [ $sped ]; then
+        echo "rebuilding files depending on $file"
+        make ${sped[@]} | indent
+    fi
+}
+
 echo "initializing dependency lists"
 for task in js-deps css-deps; do
     make $task | indent
 done
 
 echo "recursively watching $SRC for changes"
-
 inotifywait -rqme close_write $SRC | while read -r dir events file; do
     path=$dir$file
     case "$file" in
         *.less)
-            echo "changed/new file: $path"
             rel="$SRC/less/"
-            make css from="${path#$rel}" | indent
-            args=($(reverse_deps "$(realpath $path)" css))
-            if [ $args ]; then
-                echo "rebuilding files depending on $file"
-                make ${args[@]} | indent
-            fi
+            build css "$(realpath $path)"
             ;;
 
         *.js)
-            echo "changed/new file: $path"
             rel="$SRC/es6/"
-            make js from="${path#$rel}" | indent
-            args=($(reverse_deps "${path#*/}" js))
-            if [ $args ]; then
-                echo "rebuilding files depending on $file"
-                make ${args[@]} | indent
-            fi
+            build js "${path#*/}"
             ;;
 
         *)
