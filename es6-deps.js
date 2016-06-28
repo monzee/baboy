@@ -11,19 +11,19 @@ const getOpt = require('node-getopt').create([
     ['g', 'graft=PATH', 'replace the base paths of the dependencies'],
     ['', 'no-append',
         'do not include the real dependency paths. Only applicable when grafting.'],
+    ['B', 'blank-targets', 'add each dependency as a target with no prerequisites'],
     ['h', 'help', "you really need it."],
 ]).bindHelp();
 
 function transitiveDependencies(root) {
-    function walk(src, seen, recur) {
+    function walk(src, seen) {
         seen[src.location] = true;
         src.dependencies().forEach(dep => {
             let next = src.to(dep.endsWith('.js') ? dep : `${dep}.js`);
             if (next.exists() && !seen[next.location]) {
-                walk(next, seen, true);
+                walk(next, seen);
             }
         });
-        recur || delete seen[src.location];
         return Object.keys(seen);
     }
 
@@ -90,7 +90,7 @@ class Source {
 
 class External {
     constructor(from, name) {
-        this.dependent = from;
+        this.wrapped = from;
         this.location = name;
     }
 
@@ -103,7 +103,7 @@ class External {
     }
 
     to(path) {
-        return this.dependent.to(path);
+        return this.wrapped.to(path);
     }
 }
 
@@ -119,6 +119,7 @@ if (!cli.options.target && !cli.options['no-target']) {
     let graft = cli.options.graft;
     let allDeps = cli.argv.map(s => transitiveDependencies(join(root, s)).deps)
     let replace = graft && !!cli.options['no-append'];
+    let addBlanks = !!cli.options['blank-targets'];
     let depSet = allDeps.reduce((set, xs) => {
         xs.forEach(d => {
             if (!replace) {
@@ -134,7 +135,10 @@ if (!cli.options.target && !cli.options['no-target']) {
     if (cli.options['no-target']) {
         console.log(depSet);
     } else {
-        let deps = Object.keys(depSet).map(quote).join(' ');
-        target.forEach(t => console.log(`${t}: ${deps}`));
+        let deps = Object.keys(depSet).map(quote);
+        console.log(`${target.join(' ')}: ${deps.join(' ')}`);
+        if (addBlanks) {
+            deps.forEach(d => console.log(`${d}:`));
+        }
     }
 }

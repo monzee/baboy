@@ -21,18 +21,16 @@ indent() {
 
 build() {
     echo "changed/new file: $path"
-    make $1 from="${path#$rel}" | indent
     local sped=($(reverse_deps "$2" $1))
     if [ $sped ]; then
         echo "rebuilding files depending on $file"
         make ${sped[@]} | indent
+        echo "done."
     fi
 }
 
 echo "initializing dependency lists"
-for task in js-deps css-deps; do
-    make $task | indent
-done
+make init | indent
 
 echo "recursively watching $SRC for changes"
 inotifywait -rqme close_write $SRC | while read -r dir events file; do
@@ -44,8 +42,8 @@ inotifywait -rqme close_write $SRC | while read -r dir events file; do
             ;;
 
         *.js)
-            rel="$SRC/es6/"
-            build js "${path#*/}"
+            target="$TARGET/js/$file"
+            build js "${target#*/}"
             ;;
 
         *)
